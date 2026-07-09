@@ -3,6 +3,7 @@
   // ═══════════════════════════════════════════════════════════
 // 1. เอา URL จากเฟส 1 มาวางในเครื่องหมายคำพูด
 const SERVER_URL = 'https://script.google.com/macros/s/AKfycbxkAhejwTR3i9RYz3ZosPL2ItsmHTCkRdylUghpEGkwGOL7DnY7BbNMczlye4Y8w6QgbA/exec'; 
+let USER_EMAIL = ''; // 👈 ต้องมีบรรทัดนี้สแตนด์บายไว้ข้างบนสุดครับ
 
 // 🚨 แก้ไข: เอา Client ID ที่ได้จากสเตปที่ 1 มาวางตรงนี้แทนตัวเก่าของผมนะพี่
 const GOOGLE_CLIENT_ID = '137382760270-3v4vfgh682k3jf7h9a1iqjlhj7b121ar.apps.googleusercontent.com';
@@ -45,7 +46,7 @@ function handleCredentialResponse(response) {
   document.getElementById('login-screen').style.display = 'none';
   
   // 🚀 สั่งรันฟังก์ชันโหลดข้อมูลตัวเดิมของพี่ต่อได้เลย (เช่น loadDashboardData() หรือ init())
-  initApp(); 
+  loadData(); 
 }
 
 
