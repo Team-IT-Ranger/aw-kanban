@@ -742,7 +742,13 @@ function handleCredentialResponse(response) {
     //if (isDone) div.style.cursor = 'not-allowed';
     //if (isDone) div.style.cursor = 'zoom-in';
     //if (isDone) {div.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><text y="20" font-size="32">✨</text></svg>') 12 12, auto`;}
-    if (isDone) {
+
+    // ✋ 1. ถ้าการ์ดลากได้ (ย้ายได้) ให้เป็นรูปมือแบสีเหลือง
+    if (div.draggable) {
+      div.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><text y="32" font-size="32">✋</text></svg>') 16 16, grab`;
+    } 
+    // 🔒 2. ถ้าการ์ดเสร็จแล้ว (สถานะ Done) ให้ใช้โค้ดเดิมที่พี่เลือกไว้
+    else if (isDone) {
       // ปรับขนาดความเบิ้มเป็น 32px และขยับแกน y ให้ตรงกลาง
       div.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><text y="32" font-size="32">🔒</text></svg>') 20 20, auto`;
     }
