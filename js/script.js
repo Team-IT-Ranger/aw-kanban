@@ -1,8 +1,15 @@
   // ═══════════════════════════════════════════════════════════
   //  STATE
   // ═══════════════════════════════════════════════════════════
-  // const SERVER_URL = '<?= serverUrl ?>';
-  // let   USER_EMAIL = '<?= userEmail ?>';
+// 1. เอา URL จากเฟส 1 มาวางในเครื่องหมายคำพูด
+const SERVER_URL = 'https://script.google.com/macros/s/AKfycbxkAhejwTR3i9RYz3ZosPL2ItsmHTCkRdylUghpEGkwGOL7DnY7BbNMczlye4Y8w6QgbA/exec'; 
+
+// 2. ทำระบบจำอีเมลชั่วคราว (เพราะ GitHub ไม่รู้จัก User Google)
+let USER_EMAIL = localStorage.getItem('aw_user_email');
+if (!USER_EMAIL) {
+    USER_EMAIL = prompt('🔒 กรุณากรอกอีเมลของคุณเพื่อเข้าสู่ระบบ (เช่น admin@email.com):');
+    if (USER_EMAIL) localStorage.setItem('aw_user_email', USER_EMAIL);
+}
 
   let jobs = [];
   let lang = 'th';
