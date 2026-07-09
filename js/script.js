@@ -4,12 +4,50 @@
 // 1. เอา URL จากเฟส 1 มาวางในเครื่องหมายคำพูด
 const SERVER_URL = 'https://script.google.com/macros/s/AKfycbxkAhejwTR3i9RYz3ZosPL2ItsmHTCkRdylUghpEGkwGOL7DnY7BbNMczlye4Y8w6QgbA/exec'; 
 
-// 2. ทำระบบจำอีเมลชั่วคราว (เพราะ GitHub ไม่รู้จัก User Google)
-let USER_EMAIL = localStorage.getItem('aw_user_email');
-if (!USER_EMAIL) {
-    USER_EMAIL = prompt('🔒 กรุณากรอกอีเมลของคุณเพื่อเข้าสู่ระบบ (เช่น admin@email.com):');
-    if (USER_EMAIL) localStorage.setItem('aw_user_email', USER_EMAIL);
+// 🚨 แก้ไข: เอา Client ID ที่ได้จากสเตปที่ 1 มาวางตรงนี้แทนตัวเก่าของผมนะพี่
+const GOOGLE_CLIENT_ID = '137382760270-3v4vfgh682k3jf7h9a1iqjlhj7b121ar.apps.googleusercontent.com';
+
+// ฟังก์ชันเริ่มต้นระบบล็อกอิน (จะทำงานทันทีที่โหลดหน้าเว็บ)
+window.onload = function () {
+  if (typeof google !== 'undefined') {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleCredentialResponse // ถ้าร็อกอินผ่าน ให้ไปทำงานที่ฟังก์ชันนี้
+    });
+    
+    // สั่งให้วาดปุ่มล็อกอินของ Google ออกมา
+    google.accounts.id.renderButton(
+      document.getElementById("google-signin-btn"),
+      { theme: "outline", size: "large", type: "standard", shape: "pill" }  
+    );
+    
+    // (ออปชันเสริม) ดึงล็อกอินเก่าอัตโนมัติถ้าเคยเข้าไว้แล้ว
+    google.accounts.id.prompt(); 
+  }
+};
+
+// ฟังก์ชันรับข้อมูลหลังจากลูกน้องล็อกอินเสร็จ
+function handleCredentialResponse(response) {
+  // ถอดรหัส JSON Web Token (JWT) เพื่อดึงอีเมลออกมา
+  const base64Url = response.credential.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+
+  const profile = JSON.parse(jsonPayload);
+  
+  // 🎉 ดึงอีเมลสำเร็จแล้ว! เอาไปใส่ในตัวแปรหลักของระบบพี่ได้เลย
+  USER_EMAIL = profile.email; 
+  console.log("Logged in as: " + USER_EMAIL);
+
+  // ซ่อนหน้าจอเข้าสู่ระบบ แล้วสั่งโหลดข้อมูลงานจริงมาแสดงผล
+  document.getElementById('login-screen').style.display = 'none';
+  
+  // 🚀 สั่งรันฟังก์ชันโหลดข้อมูลตัวเดิมของพี่ต่อได้เลย (เช่น loadDashboardData() หรือ init())
+  initApp(); 
 }
+
 
   let jobs = [];
   let lang = 'th';
