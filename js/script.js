@@ -2,7 +2,7 @@
   //  STATE
   // ═══════════════════════════════════════════════════════════
 // 1. เอา URL จากเฟส 1 มาวางในเครื่องหมายคำพูด
-const SERVER_URL = 'https://script.google.com/macros/s/AKfycbxkAhejwTR3i9RYz3ZosPL2ItsmHTCkRdylUghpEGkwGOL7DnY7BbNMczlye4Y8w6QgbA/exec'; 
+const SERVER_URL = 'https://script.google.com/macros/s/AKfycbyajnxdz1agJe_Nd9MjsEowMQWK2u-n7xUAaEryT18PL4ODITYKr3GQOpXcp8Rh3HS3/exec'; 
 let USER_EMAIL = ''; // 👈 ต้องมีบรรทัดนี้สแตนด์บายไว้ข้างบนสุดครับ
 
 // 🚨 แก้ไข: เอา Client ID ที่ได้จากสเตปที่ 1 มาวางตรงนี้แทนตัวเก่าของผมนะพี่
