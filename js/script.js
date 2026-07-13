@@ -2591,6 +2591,9 @@ function confirmAssign(rowNum, targetStatus) {
       '</head>\n' +
       '<body onload="setTimeout(function(){ window.print(); }, 500);">\n' +
         '<div class="header">\n' +
+
+          '<img src="https://i.ibb.co/nsnkp50K/Logo-Thanatkorn-and-original-tree.jpg" alt="Thanatkorn Logo" style="height: 55px; margin-bottom: 15px;">\n' +
+    
           '<h1>ใบสรุปผลงาน (Performance Summary Report)</h1>\n' +
           '<p>เอกสารสรุปผลการปฏิบัติงาน ประจำปี ' + currentYear + '</p>\n' +
         '</div>\n' +
