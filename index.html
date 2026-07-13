@@ -9,23 +9,11 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
   
-  <link rel="stylesheet" href="css/style.css">
-
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <?!= include('styles'); ?>
 </head>
 <body>
-
-<!-- 🚀🚀🚀 แปะโค้ดหน้าจอ Login ตรงนี้เลยครับ (ใต้ <body> ทันที) 🚀🚀🚀 -->
-  <div id="login-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;">
-    <h2 style="color:var(--text); margin-bottom:20px;">🎨 Artwork Manager Kanban</h2>
-    <div id="google-signin-btn"></div>
-  </div>
-  <!-- ============================================================== -->
-
-
 <div id="app">
 
   <div id="topbar">
@@ -101,16 +89,47 @@
     <select class="filter-select" id="f-requester" onchange="renderAll()"><option value="">— Requester —</option></select>
     <select class="filter-select" id="f-assignee" onchange="renderAll()"><option value="">— Assignee —</option></select>
 
-    <select class="filter-select" id="sort-field" onchange="saveSort();renderAll()">
+    <!--select class="filter-select" id="sort-field" onchange="saveSort();renderAll()">
       <option value="no">Job No</option>
       <option value="requestDate">Submitted Date</option>
       <option value="estimatedDueDate">Due Date</option>
       <option value="expectedDate">Expected Date</option>
     </select>
+
     <select class="filter-select" id="sort-dir" onchange="saveSort();renderAll()">
       <option value="asc">↑ Asc</option>
       <option value="desc">↓ Desc</option>
     </select>
+        
+    <button class="btn-refresh" onclick="toggleSort()">
+      ↕️ เรียงลำดับ Job (Asc/Desc)
+    </button>    
+
+    <button id="sort-toggle-btn" class="btn-sort-toggle is-desc" onclick="toggleSort()">
+      ⬇️ ใหม่สุด ➔ เก่าสุด
+    </button>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      
+      <select id="sort-field" class="filter-select" onchange="onSortFieldChange()">
+        <option value="no" selected># Job No.</option>
+        <option value="agreedDue">📅 Due Date (กำหนดส่ง)</option>
+        <option value="expectedDate">🎯 Expected Date (วันใช้งาน)</option>
+      </select>
+
+      <button id="sort-toggle-btn" class="btn-sort-toggle is-desc" onclick="toggleSort()">
+        ⬇️ มาก ➔ น้อย (Desc)
+      </button>     
+    </div-->
+    <div class="sort-group-box">
+      <select id="sort-field" class="filter-select" onchange="onSortFieldChange()">
+        <option value="no" selected># Job No.</option>
+        <option value="agreedDue">📅 Due Date (กำหนดส่ง)</option>
+        <option value="expectedDate">🎯 Expected Date (วันใช้งาน)</option>
+      </select>
+      <button id="sort-toggle-btn" class="btn-sort-toggle is-desc" onclick="toggleSort()">
+        ⬇️ มาก ➔ น้อย (Desc)
+      </button>    
+    </div>
 
     <div class="filter-spacer"></div>
     <span id="total-badge">0 jobs</span>
@@ -231,8 +250,10 @@
 </div>
 
 <div id="toast-container"></div>
-
-<script src="js/script.js"></script>
+<script>
+  const SERVER_URL = '<?= serverUrl ?>';
+  let   USER_EMAIL = '<?= userEmail ?>';
+</script>
 
 <?!= include('javascript'); ?>
 </body>

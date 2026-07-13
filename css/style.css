@@ -123,6 +123,41 @@
   .btn-settings:hover { background: var(--accent2); }
 
 
+  /* ── 3D TOGGLE BUTTON (ปุ่มสลับแบบมีมิติยุบเด้ง) ── */
+  .btn-sort-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--r);
+    background: var(--bg3);
+    border: 1px solid var(--line2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    
+    /* 🪄 หัวใจของปุ่ม 3D: ยกปุ่มให้ลอยขึ้นนิดๆ และทำเงาแข็งๆ ไว้ด้านล่าง */
+    transform: translateY(-2px);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.1);
+    transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-sort-toggle:hover {
+    background: var(--bg4);
+    filter: brightness(1.1);
+  }
+
+  /* 💥 จังหวะกด (Active): ปล่อยปุ่มยุบลงไปและเปลี่ยนเป็นเงาลึก (Inset) */
+  .btn-sort-toggle:active {
+    transform: translateY(2px); /* กดแล้วปุ่มจมลงไป 4px */
+    box-shadow: 0 0 0 rgba(0,0,0,0), inset 0 3px 5px rgba(0,0,0,0.2); 
+  }
+
+  /* สีของสถานะเพื่อความชัดเจน */
+  .btn-sort-toggle.is-desc { color: var(--ocean1); border-color: rgba(14,165,233,0.3); } /* สีฟ้า = ใหม่ไปเก่า */
+  .btn-sort-toggle.is-asc { color: var(--amber); border-color: rgba(217,119,6,0.3); }   /* สีส้ม = เก่าไปใหม่ */
+
+
   /* ── MAIN CONTENT ─────────────────────────────────────────── */
   #main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
@@ -195,20 +230,58 @@
     border: 1px solid rgba(124,58,237,.2);
   }
 
-  /* ── LIST VIEW ───────────────────────────────────────────── */
-  #list-view { overflow: auto; height: 100%; padding: 20px 24px; }
-  .list-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .list-table th {
-    text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600;
-    color: var(--muted); border-bottom: 2px solid var(--line); white-space: nowrap;
-    position: sticky; top: 0; background: var(--bg); z-index: 10;
-    text-transform: uppercase; letter-spacing: 0.4px;
+  /* ── LIST VIEW (อัปเกรดแก้บั๊กตารางทะลุ 100%) ───────────────────────── */
+  /* 🚨 1. เปลี่ยน padding-top เป็น 0 เพื่ออุดช่องโหว่ด้านบนสุด */
+  #list-view { 
+    overflow: auto; 
+    height: 100%; 
+    padding: 0 24px 20px 24px; /* อุดรอยรั่วตรงนี้! */
   }
+
+  /* 🚨 2. ผลักตารางลงมาด้วย margin แทน และแยกเลเยอร์ตาราง (separate) */
+  .list-table { 
+    width: 100%; 
+    border-collapse: separate; 
+    border-spacing: 0; 
+    margin-top: 20px; /* ชดเชยพื้นที่ด้านบนที่เอา padding ออก */
+    font-size: 13px; 
+  }
+
+  /* 🚨 3. ล็อกคอหัวตารางให้ติดขอบบนสุดและยัดสีทึบ */
+  .list-table thead th, 
+  .list-table th {
+    text-align: left; 
+    padding: 12px 12px; 
+    font-size: 11px; 
+    font-weight: 600;
+    color: var(--muted); 
+    white-space: nowrap;
+    text-transform: uppercase; 
+    letter-spacing: 0.4px;
+
+    /* หัวใจสำคัญในการล็อก! */
+    position: sticky; 
+    top: 0; 
+    background-color: var(--bg2); /* ใช้ bg2 เพื่อให้สีทึบแยกจากพื้นหลังเว็บ */
+    z-index: 999;
+    
+    /* สร้างเส้นขอบและเงาให้ดูมีมิติ ตัดขาดจากเนื้อหาที่เลื่อนผ่าน */
+    border-bottom: 2px solid var(--line); 
+    box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.1);    
+  }
+
+  /* บังคับเนื้อหาด้านล่างให้อยู่ชั้นล่างสุดเสมอ */
+  .list-table tbody tr {
+    position: relative;
+    z-index: 1;
+  }
+
   .list-table td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .list-table tr:hover td { background: var(--bg3); }
   .list-table tr.overdue td:first-child { border-left: 3px solid var(--red); }
   .list-table tr.due-today td:first-child { border-left: 3px solid var(--amber); }
   .pname { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .status-pill {
     display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 500; white-space: nowrap;
   }
@@ -559,4 +632,42 @@
     z-index: 10 !important;
   }
 
+  /* ── ขยายความกว้างเฉพาะกล่องเลือกฟิลด์จัดเรียง (Sorting) ── */
+  #sort-field {
+    max-width: 180px !important; /* ปลดล็อกและขยายให้ยาวขึ้น (ปรับตัวเลขได้ตามใจชอบ) */
+    width: 180px; 
+  }
 
+  /* ── กรอบจัดกลุ่มปุ่ม Sorting (Grouping Box) ── */
+  .sort-group-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px; /* เพิ่มพื้นที่ให้กล่องหายใจ */
+    margin-left: 4px;
+    position: relative;
+    
+    /* สร้างเส้นกรอบมนๆ */
+    border: 1px solid var(--line2);
+    border-radius: var(--r2); 
+    background: rgba(0,0,0,0.02); /* ดรอปสีพื้นให้เข้ม/อ่อนกว่ารอบนอกนิดนึงเพื่อแยกสัดส่วน */
+  }
+
+  /* 🪄 ทริคพิเศษ: สร้างตัวหนังสือเล็กๆ แปะทับบนเส้นกรอบ (Floating Label) */
+  .sort-group-box::before {
+    content: 'จัดเรียงข้อมูล (SORT)';
+    position: absolute;
+    top: -8px; /* ดันตัวหนังสือลอยขึ้นไปทับเส้นขอบ */
+    left: 10px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--bg2); /* สีพื้นหลังเดียวกับแท่นบาร์ เพื่อกลืนเส้นกรอบทิ้ง */
+    padding: 0 6px;
+    letter-spacing: 0.5px;
+  }
+
+  /* เวลาเอาเมาส์ไปชี้ให้กรอบสว่างขึ้นนิดนึง */
+  .sort-group-box:hover {
+    border-color: rgba(14,165,233,0.3);
+  }

@@ -148,30 +148,117 @@ function handleCredentialResponse(response) {
     }).then(r => r.json());
   }
 
+
   // ═══════════════════════════════════════════════════════════
   //  SORTING
+  //  SORTING (อัปเกรดใหม่: ฉลาดขึ้น และ Default เป็น ใหม่ -> เก่า)
   // ═══════════════════════════════════════════════════════════
   function saveSort() {
-    const field = document.getElementById('sort-field').value;
-    const dir = document.getElementById('sort-dir').value;
+    const fieldElement = document.getElementById('sort-field');
+    const dirElement = document.getElementById('sort-dir');
+    
+    const field = fieldElement ? fieldElement.value : 'no';
+    const dir = dirElement ? dirElement.value : 'desc';
+    
     try { localStorage.setItem('aw_sort', JSON.stringify({ field, dir })); } catch(e) {}
   }
+  // ═══════════════════════════════════════════════════════════
+  //  SORTING (อัปเกรดล่าสุด: เลือก Field ได้ + ปุ่มสลับ 3D)
+  // ═══════════════════════════════════════════════════════════
+  let currentSortDir = 'desc'; 
+
+  // 1. ฟังก์ชันโหลดค่าตอนเปิดแอป (อัปเกรด: บังคับรีเซ็ตเป็น Job No. + Desc เสมอ)
   function loadSort() {
     try {
-      const s = JSON.parse(localStorage.getItem('aw_sort') || '{}');
-      if (s.field) document.getElementById('sort-field').value = s.field;
-      if (s.dir)   document.getElementById('sort-dir').value = s.dir;
-    } catch(e) {}
+      // 🚨 บังคับทิศทางให้เป็น 'desc' (มาก ➔ น้อย) เสมอ
+      currentSortDir = 'desc';
+      
+      // 🚨 บังคับยัดค่า 'no' ลงกล่อง Dropdown เสมอ
+      const sf = document.getElementById('sort-field');
+      if (sf) {
+        sf.value = 'no';
+      }
+      
+      // 🧹 สั่งล้างความจำเก่าในเบราว์เซอร์ทิ้งให้หมดเกลี้ยง!
+      localStorage.removeItem('aw_sort_field');
+      localStorage.removeItem('aw_sort_dir');
+      
+    } catch(e) {
+      currentSortDir = 'desc';
+    }
+    
+    // อัปเดตหน้าตาปุ่มให้ตรงกับค่าที่เราเพิ่งบังคับไป
+    updateSortButtonUI();
   }
+
+  // 2. ฟังก์ชันเมื่อผู้ใช้กดเปลี่ยนกล่อง Dropdown
+  function onSortFieldChange() {
+    const field = document.getElementById('sort-field').value;
+    try { localStorage.setItem('aw_sort_field', field); } catch(e) {}
+    
+    renderAll(); // สั่งวาดข้อมูลใหม่ทันที
+    toast(lang === 'th' ? 'เปลี่ยนเกณฑ์จัดเรียงแล้ว' : 'Sort field updated', 'info');
+  }
+
+  // 3. ฟังก์ชันอัปเดตหน้าตาปุ่ม 3D
+  function updateSortButtonUI() {
+    const btn = document.getElementById('sort-toggle-btn');
+    if (!btn) return;
+
+    if (currentSortDir === 'desc') {
+      btn.innerHTML = '⬇️ มาก ➔ น้อย (Desc)';
+      btn.className = 'btn-sort-toggle is-desc';
+    } else {
+      btn.innerHTML = '⬆️ น้อย ➔ มาก (Asc)';
+      btn.className = 'btn-sort-toggle is-asc';
+    }
+  }
+
+  // 4. ฟังก์ชันเมื่อกดปุ่มสลับ
+  function toggleSort() {
+    currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
+    try { localStorage.setItem('aw_sort_dir', currentSortDir); } catch(e) {}
+    
+    updateSortButtonUI(); 
+    renderAll(); 
+  }
+
+  // 🚀 5. หัวใจสำคัญ: ลอจิกการจัดเรียงที่รองรับทั้งตัวเลขและวันที่
   function getSorted(arr) {
-    const field = document.getElementById('sort-field')?.value || 'no';
-    const dir = document.getElementById('sort-dir')?.value || 'asc';
+    const fieldElement = document.getElementById('sort-field');
+    const field = fieldElement ? fieldElement.value : 'no'; // Default คือ no เสมอ
+
     return [...arr].sort((a, b) => {
-      let av = a[field] || '', bv = b[field] || '';
-      if (field === 'no') { av = Number(av)||0; bv = Number(bv)||0; return dir==='asc' ? av-bv : bv-av; }
-      return dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      
+      // 🎯 กรณีที่ 1: เรียงตาม Job Number (แยกเฉพาะตัวเลขมาคำนวณ)
+      if (field === 'no') {
+        let numA = parseInt(String(a.no || '').replace(/\D/g, ''), 10) || 0;
+        let numB = parseInt(String(b.no || '').replace(/\D/g, ''), 10) || 0;
+        return currentSortDir === 'asc' ? numA - numB : numB - numA;
+      }
+      
+      // 🎯 กรณีที่ 2 & 3: เรียงตามวันที่
+      let valA = '', valB = '';
+      if (field === 'agreedDue') {
+        valA = a.estimatedDueDate || a.finalDueDate || a.agreedDate || '';
+        valB = b.estimatedDueDate || b.finalDueDate || b.agreedDate || '';
+      } else if (field === 'expectedDate') {
+        valA = a.expectedDate || '';
+        valB = b.expectedDate || '';
+      }
+
+      // 💡 ทริคพิเศษ: ถ้ามีงานไหน "ไม่มีข้อมูลวันที่" ให้ดันไปอยู่ท้ายสุดเสมอ (จะได้ไม่ขึ้นมาเกะกะข้างบน)
+      if (!valA && valB) return 1;
+      if (valA && !valB) return -1;
+      if (!valA && !valB) return 0;
+
+      // เปรียบเทียบวันที่ (พิกัด String รูปแบบ YYYY-MM-DD เรียงตามตัวอักษรได้เลย)
+      return currentSortDir === 'asc' 
+        ? String(valA).localeCompare(String(valB)) 
+        : String(valB).localeCompare(String(valA));
     });
   }
+
 
   // ═══════════════════════════════════════════════════════════
   //  GANTT VIEW
@@ -523,31 +610,54 @@ function handleCredentialResponse(response) {
   }
 
 
-  // Apply optimistic update locally
+// Apply optimistic update locally (แก้ไขให้รู้จักกฎ Due Date ล่าสุด!)
   function applyLocalChange(payload) {
     const j = jobs.find(x => x.rowNum === payload.rowNum);
     if (!j) return;
 
-    // 🛠️ 💡 จุดดักช่องโหว่: ถ้างานนี้ยังไม่มีวันเริ่มทำ (startedDate ว่าง, เป็น null หรือเป็น '—')
-    // และกำลังจะทำแอคชันเปลี่ยนสถานะใด ๆ (ยกเว้นแค่การอัปเดต Priority) ให้แสตมป์วันที่วันนี้ทันที
+    // 🛠️ 💡 จุดดักช่องโหว่: แสตมป์วันเริ่มทำ
     if (payload.action !== 'updatePriority' && (!j.startedDate || j.startedDate === '—' || j.startedDate === '')) {
       const today = todayStr();
       j.startedDate = today;
-      payload.startedDate = today; // 🔥 แปะตัวแปรนี้เข้าไปใน payload เพื่อส่งไปให้เซิร์ฟเวอร์หลังบ้านบันทึกด้วย
+      payload.startedDate = today; 
     }
 
-    // --- โค้ดเงื่อนไขเดิมด้านล่างปล่อยไว้เหมือนเดิมเลยครับ ---
     if (payload.action === 'advanceStatus' || payload.action === 'updateStatus') {
       j.status = payload.status;
       if (payload.assignee)         j.assignee = payload.assignee;
       if (payload.estimatedDueDate) j.estimatedDueDate = payload.estimatedDueDate;
       if (payload.startedDate)      j.startedDate = payload.startedDate;
     }
-    if (payload.action === 'assignJob')   { j.status = 'Start'; j.assignee = payload.assignee; j.estimatedDueDate = payload.estimatedDueDate; j.startedDate = todayStr(); }
-    if (payload.action === 'jobUpdate')   { j.status = 'Progress50'; j.assignee = payload.assignee; j.estimatedDueDate = payload.estimatedDueDate; }
-    if (payload.action === 'jobUpdate80') { j.status = 'Progress80'; j.assignee = payload.assignee; j.estimatedDueDate = payload.estimatedDueDate; }
+    
+    // 🚀 เพิ่มการดักจับตัวแปรใหม่ที่เพิ่งเพิ่มเข้ามาให้ครบ (Hours, Revised, Final, Note)
+    if (payload.action === 'assignJob') { 
+      j.status = 'Start'; 
+      j.assignee = payload.assignee; 
+      if (payload.estimatedWorkhours) j.estimatedWorkhours = payload.estimatedWorkhours;
+      if (payload.revisedDueDate) j.revisedDueDate = payload.revisedDueDate; 
+      if (payload.completionNote !== undefined) j.completionNote = payload.completionNote;
+      j.startedDate = j.startedDate || todayStr(); 
+    }
+    if (payload.action === 'jobUpdate') { 
+      j.status = 'Progress50'; 
+      j.assignee = payload.assignee; 
+      if (payload.estimatedWorkhours) j.estimatedWorkhours = payload.estimatedWorkhours;
+      if (payload.finalDueDate) j.finalDueDate = payload.finalDueDate; 
+      if (payload.completionNote !== undefined) j.completionNote = payload.completionNote;
+    }
+    if (payload.action === 'jobUpdate80') { 
+      j.status = 'Progress80'; 
+      j.assignee = payload.assignee; 
+      if (payload.estimatedWorkhours) j.estimatedWorkhours = payload.estimatedWorkhours;
+      if (payload.finalDueDate) j.finalDueDate = payload.finalDueDate; 
+      if (payload.completionNote !== undefined) j.completionNote = payload.completionNote;
+    }
     if (payload.action === 'reviewJob')   { j.status = 'Review'; }
-    if (payload.action === 'completeJob') { j.status = 'Done'; j.deliveredDate = todayStr(); j.completionNote = payload.completionNote || ''; j.completedDate = todayStr(); if (j.estimatedDueDate) j.mbo = dayDiff(j.estimatedDueDate, todayStr()); }
+    if (payload.action === 'completeJob') { 
+      j.status = 'Done'; j.deliveredDate = todayStr(); j.completionNote = payload.completionNote || ''; j.completedDate = todayStr(); 
+      const due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate;
+      if (due) j.mbo = dayDiff(due, todayStr()); 
+    }
     if (payload.action === 'updatePriority') { (payload.updates||[]).forEach(u => { const jj = jobs.find(x=>x.rowNum===u.rowNum); if (jj) jj.priority = u.priority; }); }
   }
 
@@ -745,7 +855,7 @@ function handleCredentialResponse(response) {
     const { 
       rowNum, no, requestDate, projectName, department, format, type, 
       referenceLink, outputLink1, outputLink2, outputLink3, outputLink4, outputLink5,
-      status, assignee, mbo, estimatedDueDate, finalDueDate, expectedDate 
+      status, assignee, mbo, estimatedDueDate, finalDueDate, revisedDueDate, expectedDate 
     } = j;
 
     const div = document.createElement('div');
@@ -767,17 +877,17 @@ function handleCredentialResponse(response) {
     // 🔒 2. ถ้าการ์ดเสร็จแล้ว (สถานะ Done) ให้ใช้โค้ดเดิมที่พี่เลือกไว้
     else if (isDone) {
       // ปรับขนาดความเบิ้มเป็น 32px และขยับแกน y ให้ตรงกลาง
-      div.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><text y="32" font-size="32">🔒</text></svg>') 20 20, auto`;
+      div.style.cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><text y="32" font-size="32">🔒</text></svg>') 20 20, auto`;
     }
 
     div.addEventListener('dragstart', e => onCardDragStart(e, j));
     div.addEventListener('dragend', onCardDragEnd);
 
     // หา Due Date 
-    const dueStr = estimatedDueDate || finalDueDate || expectedDate || '';
+    const dueStr = finalDueDate || revisedDueDate || estimatedDueDate || expectedDate || '';
     const dueDisp = dueStr ? formatDateDisp(dueStr) : (lang === 'th' ? 'ยังไม่มีกำหนด' : 'No due date');
     const dueClass = dueStr ? overdueClass : 'ok';
-    
+
     // ตรวจสอบข้อมูลต่างๆ
     const mboStr = mbo !== '' && mbo !== undefined ? (mbo >= 0 ? `+${mbo}d` : `${mbo}d`) : '';
     const hasRef = !!referenceLink;
@@ -803,6 +913,7 @@ function handleCredentialResponse(response) {
       </div>
       <div class="card-actions">${makeCardActions(j)}</div>
     `;
+
     return div;
   }
 
@@ -832,11 +943,16 @@ function handleCredentialResponse(response) {
         <thead><tr>
           <th>#</th>
           <th>${lang==='th'?'ชื่องาน':'Project Name'}</th>
-          <th>Dept</th><th>Format</th><th>Type</th>
+          <th>Format / Type</th>
+          <th>${lang==='th'?'ผู้ของาน':'Requester'}</th>
+          <th>${lang==='th'?'วันที่ส่งคำขอ':'Requsted Date'}</th>
+          <th>${lang==='th'?'วันใช้งาน':'Expected Date'}</th>
+          <th>${lang==='th'?'สถานะงาน':'Job Status'}</th>
           <th>${lang==='th'?'ผู้รับผิดชอบ':'Assignee'}</th>
-          <th>${lang==='th'?'สถานะ':'Status'}</th>
-          <th>${lang==='th'?'กำหนดส่ง':'Due Date'}</th>
-          <th>MBO</th>
+          <th>${lang==='th'?'กำหนดส่ง':'Agreed Due Date'}</th>
+          <th>${lang==='th'?'วันที่ส่งมอบ':'Delivered Date'}</th>
+          <th>Worked Days</th>
+          <th>KPI (Early+)</th>
           <th>${lang==='th'?'ไฟล์':'Files'}</th>
           <th>${lang==='th'?'Action':'Action'}</th>
         </tr></thead>
@@ -844,6 +960,42 @@ function handleCredentialResponse(response) {
       </table>`;
   }
 
+
+  // =========================================================================
+  // ⏱️ ฟังก์ชันคำนวณวันทำงานจริง (เอาไปวางไว้ตรงไหนก็ได้ในไฟล์ หรือวางเหนือ listRow)
+  // =========================================================================
+  function calcActualWorkedDays(startStr, endStr, holidaysArray) {
+    if (!startStr || startStr === '—' || startStr === '') return '—';
+    try {
+      const parseDate = (dStr) => new Date(dStr.includes('T') ? dStr : dStr + 'T00:00:00');
+      let start = parseDate(startStr);
+      let end = endStr && endStr !== '—' ? parseDate(endStr) : new Date();
+      
+      if (isNaN(start.getTime())) return 'Err'; // ถ้าขึ้น Err แปลว่ารูปแบบวันที่จากฐานข้อมูลอ่านไม่ได้
+      
+      start.setHours(0,0,0,0);
+      end.setHours(0,0,0,0);
+      if (end < start) return 0;
+      
+      let count = 0;
+      let cur = new Date(start);
+      while (cur <= end) {
+        let dow = cur.getDay();
+        let y = cur.getFullYear();
+        let m = String(cur.getMonth() + 1).padStart(2, '0');
+        let d = String(cur.getDate()).padStart(2, '0');
+        let ds = `${y}-${m}-${d}`;
+        if (dow !== 0 && dow !== 6 && !(holidaysArray && holidaysArray.includes(ds))) count++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return count;
+    } catch (e) {
+      return 'Err';
+    }
+  }
+
+
+  /*
   function listRow(j) {
     const oc = getOverdueClass(j);
     const due = j.estimatedDueDate||j.finalDueDate||j.expectedDate||'';
@@ -877,6 +1029,133 @@ function handleCredentialResponse(response) {
       </td>
     </tr>`;
   }
+  function listRow(j) {
+    const oc = getOverdueClass(j);
+    // การคำนวณ KPI (จากตัวแปรเดิม mbo)
+    const mboVal = j.mbo !== '' && j.mbo !== undefined ? j.mbo : '';
+    const mboClass = mboVal === '' ? '' : (mboVal > 0 ? 'mbo-pos' : mboVal < 0 ? 'mbo-neg' : 'mbo-zero');
+
+    // Build output file links for list
+    const outputLinks = [j.outputLink1,j.outputLink2,j.outputLink3,j.outputLink4,j.outputLink5]
+      .filter(Boolean)
+      .map((url,i) => `<a href="${url}" target="_blank" title="ไฟล์ ${i+1}" style="margin-right:4px;font-size:14px;">📄</a>`)
+      .join('');
+    const refLink = j.referenceLink ? `<a href="${j.referenceLink}" target="_blank" title="Reference File" style="font-size:14px;">🔗</a>` : '';
+
+    // 💡 คอลัมน์ 3: นำ Format กับ Type มารวมร่างกัน
+    const formatType = `${j.format || '-'} / ${j.type || '-'}`;
+
+    return `<tr class="${oc}" onclick="openDetail(${j.rowNum})" style="cursor:pointer;">
+      
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted);">${j.no || '-'}</td>
+      
+      <td><div class="pname" title="${esc(j.projectName)}">${esc(j.projectName)}</div></td>
+      
+      <td>${formatType}</td>
+      
+      <td>${j.requester || j.department || '—'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;">${j.reqDate ? formatDateDisp(j.reqDate) : '—'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;">${j.expectedDate ? formatDateDisp(j.expectedDate) : '—'}</td>
+      
+      <td><span class="status-pill ${PILL_CLASS[j.status]||''}">${slabel(j.status)}</span></td>
+      
+      <td>${j.assignee ? `<span style="display:flex;align-items:center;gap:5px;"><span class="avatar">${j.assignee.charAt(0)}</span>${j.assignee}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;" class="${oc==='overdue'?'card-due overdue':oc==='due-today'?'card-due due-today':''}">${j.estimatedDueDate || j.agreedDate ? formatDateDisp(j.estimatedDueDate || j.agreedDate) : '—'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;">${j.deliveredDate ? formatDateDisp(j.deliveredDate) : '—'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;text-align:center;">${j.workedDays !== undefined && j.workedDays !== '' ? j.workedDays : '—'}</td>
+      
+      <td class="${mboClass}" style="font-family:var(--mono);font-size:12px;text-align:center;">${mboVal !== '' ? (mboVal>0?'+':'')+mboVal+'d' : '—'}</td>
+      
+      <td onclick="event.stopPropagation()" style="white-space:nowrap;">${refLink}${outputLinks}</td>
+      
+      <td onclick="event.stopPropagation()">
+        ${canEdit() && j.status==='new' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openAssign(${j.rowNum})">${lang==='th'?'มอบหมาย':'Assign'}</button>` : ''}
+        ${canEdit() && j.status==='Start' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="updateProgress(${j.rowNum})">${lang==='th'?'คืบหน้า 50%':'Progress 50%'}</button>` : ''}
+        ${canEdit() && j.status==='Progress50' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="updateProgress80(${j.rowNum})">${lang==='th'?'คืบหน้า 80%':'Progress 80%'}</button>` : ''}
+        ${canEdit() && j.status==='Progress80' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openReview(${j.rowNum})">${lang==='th'?'ส่งตรวจ':'Review'}</button>` : ''}
+        ${canEdit() && j.status==='Review' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openComplete(${j.rowNum})">${lang==='th'?'เสร็จ':'Done'}</button>` : ''}
+      </td>
+    </tr>`;
+  }
+  */
+// =========================================================================
+  // 📋 ฟังก์ชัน listRow (ก๊อปปี้เหมาเข่งไปวางทับของเดิมตั้งแต่บรรทัดแรกยันบรรทัดสุดท้าย)
+  // =========================================================================
+  function listRow(j) {
+    const oc = getOverdueClass(j);
+    const mboVal = j.mbo !== '' && j.mbo !== undefined ? j.mbo : '';
+    const mboClass = mboVal === '' ? '' : (mboVal > 0 ? 'mbo-pos' : mboVal < 0 ? 'mbo-neg' : 'mbo-zero');
+
+    const outputLinks = [j.outputLink1,j.outputLink2,j.outputLink3,j.outputLink4,j.outputLink5]
+      .filter(Boolean)
+      .map((url,i) => `<a href="${url}" target="_blank" title="ไฟล์ ${i+1}" style="margin-right:4px;font-size:14px;">📄</a>`)
+      .join('');
+    const refLink = j.referenceLink ? `<a href="${j.referenceLink}" target="_blank" title="Reference File" style="font-size:14px;">🔗</a>` : '';
+    const formatType = `${j.format || '-'} / ${j.type || '-'}`;
+
+
+    // 🚀 ลอจิกการคำนวณ Worked Days (ดึง requestDate มาใช้ถ้ายอมแพ้ไม่มี startedDate)
+    let startDateForCalc = j.startedDate;
+    if (!startDateForCalc || startDateForCalc === '—' || startDateForCalc === '') {
+      startDateForCalc = j.requestDate; 
+    }
+    const endDateForCalc = (j.status === 'Done') ? (j.deliveredDate || j.completedDate) : todayStr();
+    
+    // โยนเข้าเครื่องคิดเลข
+    let computedWorkedDays = '—';
+    if (j.status !== 'new') { // ถ้าเป็นงานใหม่ ยังไม่นับ
+      computedWorkedDays = calcActualWorkedDays(startDateForCalc, endDateForCalc, settings.holidays);
+    }
+
+    // สร้าง Tag แจ้งเตือนสีกระพริบถ้าทำนานเกิน 5 วัน
+    let workedDaysHTML = '—';
+    if (computedWorkedDays !== '—') {
+      if (computedWorkedDays > 5 && j.status !== 'Done') {
+        workedDaysHTML = `<span style="color:var(--amber); font-weight:bold;">${computedWorkedDays} วัน</span>`;
+      } else {
+        workedDaysHTML = `${computedWorkedDays} วัน`;
+      }
+    }
+
+    // สร้างตัวแปรดึงวันที่ตามลำดับ: Final > Revised > Estimated > Expected
+    const displayDue = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate;
+
+    return `<tr class="${oc}" onclick="openDetail(${j.rowNum})" style="cursor:pointer;">
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted);">${j.no || '-'}</td>
+      <td><div class="pname" title="${esc(j.projectName)}">${esc(j.projectName)}</div></td>
+      <td>${formatType}</td>
+      <td>${j.requestedBy || j.department || '—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${j.requestDate ? formatDateDisp(j.requestDate) : '—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${j.expectedDate ? formatDateDisp(j.expectedDate) : '—'}</td>
+      <td><span class="status-pill ${PILL_CLASS[j.status]||''}">${slabel(j.status)}</span></td>
+      <td>${j.assignee ? `<span style="display:flex;align-items:center;gap:5px;"><span class="avatar">${j.assignee.charAt(0)}</span>${j.assignee}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+     
+      <!-- 🚨 เปลี่ยนคอลัมน์ Due Date ให้แสดงค่าจาก displayDue แทน -->
+      <td style="font-family:var(--mono);font-size:12px;" class="${oc==='overdue'?'card-due overdue':oc==='due-today'?'card-due due-today':''}">${displayDue ? formatDateDisp(displayDue) : '—'}</td>     
+
+      <td style="font-family:var(--mono);font-size:12px;">${j.deliveredDate ? formatDateDisp(j.deliveredDate) : '—'}</td>
+      
+      <td style="font-family:var(--mono);font-size:12px;text-align:center;">${workedDaysHTML}</td>
+      
+      <td class="${mboClass}" style="font-family:var(--mono);font-size:12px;text-align:center;">${mboVal !== '' ? (mboVal>0?'+':'')+mboVal+'d' : '—'}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap;">${refLink}${outputLinks}</td>
+      <td onclick="event.stopPropagation()">
+        ${canEdit() && j.status==='new' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openAssign(${j.rowNum})">${lang==='th'?'มอบหมาย':'Assign'}</button>` : ''}
+        ${canEdit() && j.status==='Start' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="updateProgress(${j.rowNum})">${lang==='th'?'คืบหน้า 50%':'Progress 50%'}</button>` : ''}
+        ${canEdit() && j.status==='Progress50' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="updateProgress80(${j.rowNum})">${lang==='th'?'คืบหน้า 80%':'Progress 80%'}</button>` : ''}
+        ${canEdit() && j.status==='Progress80' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openReview(${j.rowNum})">${lang==='th'?'ส่งตรวจ':'Review'}</button>` : ''}
+        ${canEdit() && j.status==='Review' ? `<button class="card-btn primary" style="white-space:nowrap;" onclick="openComplete(${j.rowNum})">${lang==='th'?'เสร็จ':'Done'}</button>` : ''}
+      </td>
+    </tr>`;
+  }
+
+
+
 
   // ═══════════════════════════════════════════════════════════
   //  DRAG & DROP
@@ -968,10 +1247,13 @@ function handleCredentialResponse(response) {
     return lang==='th' ? 'ขั้นต่อไป →' : 'Next Step →';
   }
 
-  function openDetail(rowNum) {
+
+function openDetail(rowNum) {
     const j = jobs.find(x => x.rowNum === rowNum);
     if (!j) return;
-    const due = j.estimatedDueDate || j.finalDueDate || j.expectedDate || '';
+    
+    // 🚀 เปลี่ยนแค่บรรทัดนี้: เรียงลำดับ Due Date ตามกฎใหม่เป๊ะๆ
+    const due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate || '';
 
     const fileLinks = [j.outputLink1,j.outputLink2,j.outputLink3,j.outputLink4,j.outputLink5]
       .filter(Boolean)
@@ -1055,15 +1337,13 @@ function handleCredentialResponse(response) {
         // 2. เอาประวัติงานมาต่อท้าย Footer อีกทีหนึ่ง
         var historyBox = '<div id="history-box-' + j.no + '" style="margin-top:14px; display:none; padding-top:14px; border-top:1px dashed var(--line2);"></div>';
 
-        // จัดเรียงตำแหน่งใหม่: เอา historyBtn ไปไว้หน้าสุด เพื่อให้มันดันปุ่มที่เหลือไปชิดขวา
-        // return '<div class="modal-footer">' + historyBtn + rejectBtn + editBtn + nextBtn + '<button class="btn-cancel" onclick="closeModal()">' + (lang==='th'?'ปิด':'Close') + '</button></div>';
-
         return footer + historyBox;
       })()
 
     );
   }
 
+  
 
   // ── EDIT OUTPUT FILES (for Done jobs) ────────────────────
   function openEditOutputFiles(rowNum) {
@@ -1123,27 +1403,41 @@ function handleCredentialResponse(response) {
   function openAssignWithStatus(rowNum, targetStatus) {
     const j = jobs.find(x=>x.rowNum===rowNum); if (!j) return;
     const hrs = j.estimatedWorkhours || 8;
-    const expDate = j.expectedDate || null;
     
-    // คำนวณวันกำหนดส่ง
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    // 🚀 ลอจิกใหม่: ดึงวันที่ตาม Priority (Final > Revised > Estimated > Expected) มาโชว์
+    let due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate;
+    if (!due) due = calcDueDate(todayStr(), hrs, settings.holidays, null);
 
     const designerOpts = settings.designers.map(d=>`<option value="${d}" ${d===settings.userName?'selected':''}>${d}</option>`).join('');
+    
+    // 🚀 ย้ายมาใช้คอลัมน์ Completion Note เพียวๆ
+    const existingRemark = j.completionNote || ''; 
+
     showModal(`
       <div class="modal-title">🎨 ${lang==='th'?'มอบหมายงาน':'Assign Job'}</div>
       <div class="modal-section"><div class="modal-label">${lang==='th'?'ชื่องาน':'Project'}</div><div class="modal-value">${esc(j.projectName)}</div></div>
       <div class="modal-section">
         <div class="modal-label">${lang==='th'?'มอบหมายให้':'Assign to'}</div>
-        <select class="modal-input" id="assign-designer" onchange="updateDuePreview(${rowNum})">${designerOpts}</select>
+        <select class="modal-input" id="assign-designer">${designerOpts}</select>
       </div>
       <div class="modal-section">
         <div class="modal-label">${lang==='th'?'ชั่วโมงทำงาน':'Est. Hours'}</div>
         <input type="number" class="modal-input" id="assign-hrs" value="${hrs}" min="1" max="200" oninput="updateDuePreview(${rowNum})">
       </div>
-      <div class="due-preview" id="due-preview">
-        📅 ${lang==='th'?'กำหนดส่งโดยประมาณ:':'Est. due:'} <strong id="due-calc-result">${formatDateDisp(due)}</strong>
-        <span style="font-size:11px;color:var(--muted);">(${lang==='th'?'ข้ามวันหยุด':'skip weekends & holidays'})</span>
+      
+      <div class="modal-section" style="margin-top:14px; background:var(--bg3); padding:12px; border-radius:var(--r); border:1px solid var(--line);">
+        <div class="modal-label" style="display:flex; justify-content:space-between;">
+          <span style="color:var(--ocean1);">📅 ${lang==='th'?'วันที่กำหนดส่ง (Agreed Due Date)':'Due Date'}</span>
+          <span style="font-size:10px; color:var(--muted); font-weight:normal;">(ระบบคำนวณให้ แก้ไขได้)</span>
+        </div>
+        <input type="date" class="modal-input" id="assign-due-date" value="${due}" style="font-family:var(--mono); font-weight:bold; font-size:14px; color:var(--ocean1);">
       </div>
+
+      <div class="modal-section" style="margin-top:14px;">
+        <div class="modal-label">${lang==='th'?'หมายเหตุ / บรีฟ (Completion Note)':'Remarks'}</div>
+        <textarea class="modal-input" id="assign-remark" rows="2" placeholder="${lang==='th'?'พิมพ์หมายเหตุหรือบรีฟเพิ่มเติมที่นี่...':'Add remarks...'}">${esc(existingRemark)}</textarea>
+      </div>
+
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal()">${lang==='th'?'ยกเลิก':'Cancel'}</button>
         <button class="btn-primary" onclick="confirmAssign(${rowNum},'${targetStatus}')">${lang==='th'?'✓ ยืนยัน':'✓ Confirm'}</button>
@@ -1155,18 +1449,35 @@ function handleCredentialResponse(response) {
   function updateProgressWithStatus(rowNum, targetStatus) {
     const j = jobs.find(x=>x.rowNum===rowNum); if (!j) return;
     const hrs = j.estimatedWorkhours || 8;
-    const expDate = j.expectedDate || null;
     
-    // คำนวณวันกำหนดส่ง
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    // 🚀 ดึงวันที่ตาม Priority
+    let due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate;
+    if (!due) due = calcDueDate(todayStr(), hrs, settings.holidays, null);
 
     const designerOpts = settings.designers.map(d=>`<option value="${d}" ${d===settings.userName?'selected':''}>${d}</option>`).join('');
+    
+    // 🚀 ใช้ Completion Note
+    const existingRemark = j.completionNote || ''; 
+
     showModal(`
       <div class="modal-title">🎨 ${lang==='th'?'แจ้งงานคืบหน้า ±50%':'Update Progress 50%'}</div>
       <div class="modal-section"><div class="modal-label">Project</div><div class="modal-value">${esc(j.projectName)}</div></div>
-      <div class="modal-section"><div class="modal-label">Assign to</div><select class="modal-input" id="assign-designer" onchange="updateDuePreview(${rowNum})">${designerOpts}</select></div>
+      <div class="modal-section"><div class="modal-label">Assign to</div><select class="modal-input" id="assign-designer">${designerOpts}</select></div>
       <div class="modal-section"><div class="modal-label">Est. Hours</div><input type="number" class="modal-input" id="assign-hrs" value="${hrs}" min="1" max="200" oninput="updateDuePreview(${rowNum})"></div>
-      <div class="due-preview" id="due-preview">📅 ${lang==='th'?'กำหนดส่ง:':'Est. due:'} <strong id="due-calc-result">${formatDateDisp(due)}</strong></div>
+      
+      <div class="modal-section" style="margin-top:14px; background:var(--bg3); padding:12px; border-radius:var(--r); border:1px solid var(--line);">
+        <div class="modal-label" style="display:flex; justify-content:space-between;">
+          <span style="color:var(--ocean1);">📅 ${lang==='th'?'วันที่กำหนดส่ง (Agreed Due Date)':'Due Date'}</span>
+          <span style="font-size:10px; color:var(--muted); font-weight:normal;">(ระบบคำนวณให้ แก้ไขได้)</span>
+        </div>
+        <input type="date" class="modal-input" id="assign-due-date" value="${due}" style="font-family:var(--mono); font-weight:bold; font-size:14px; color:var(--ocean1);">
+      </div>
+
+      <div class="modal-section" style="margin-top:14px;">
+        <div class="modal-label">${lang==='th'?'หมายเหตุ (Completion Note)':'Remarks'}</div>
+        <textarea class="modal-input" id="assign-remark" rows="2" placeholder="${lang==='th'?'พิมพ์อัปเดตหมายเหตุ...':'Update remarks...'}">${esc(existingRemark)}</textarea>
+      </div>
+
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal()">${lang==='th'?'ยกเลิก':'Cancel'}</button>
         <button class="btn-primary" onclick="confirmJobUpdate(${rowNum},'${targetStatus}')">${lang==='th'?'✓ ยืนยัน':'✓ Confirm'}</button>
@@ -1178,93 +1489,114 @@ function handleCredentialResponse(response) {
   function updateProgress80WithStatus(rowNum, targetStatus) {
     const j = jobs.find(x=>x.rowNum===rowNum); if (!j) return;
     const hrs = j.estimatedWorkhours || 8;
-    const expDate = j.expectedDate || null;
     
-    // คำนวณวันกำหนดส่ง
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    // 🚀 ดึงวันที่ตาม Priority
+    let due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate;
+    if (!due) due = calcDueDate(todayStr(), hrs, settings.holidays, null);
 
     const designerOpts = settings.designers.map(d=>`<option value="${d}" ${d===settings.userName?'selected':''}>${d}</option>`).join('');
+    
+    // 🚀 ใช้ Completion Note
+    const existingRemark = j.completionNote || ''; 
+
     showModal(`
       <div class="modal-title">🎨 ${lang==='th'?'แจ้งงานคืบหน้า ±80%':'Update Progress 80%'}</div>
       <div class="modal-section"><div class="modal-label">Project</div><div class="modal-value">${esc(j.projectName)}</div></div>
-      <div class="modal-section"><div class="modal-label">Assign to</div><select class="modal-input" id="assign-designer" onchange="updateDuePreview(${rowNum})">${designerOpts}</select></div>
+      <div class="modal-section"><div class="modal-label">Assign to</div><select class="modal-input" id="assign-designer">${designerOpts}</select></div>
       <div class="modal-section"><div class="modal-label">Est. Hours</div><input type="number" class="modal-input" id="assign-hrs" value="${hrs}" min="1" max="200" oninput="updateDuePreview(${rowNum})"></div>
-      <div class="due-preview" id="due-preview">📅 ${lang==='th'?'กำหนดส่ง:':'Est. due:'} <strong id="due-calc-result">${formatDateDisp(due)}</strong></div>
+      
+      <div class="modal-section" style="margin-top:14px; background:var(--bg3); padding:12px; border-radius:var(--r); border:1px solid var(--line);">
+        <div class="modal-label" style="display:flex; justify-content:space-between;">
+          <span style="color:var(--ocean1);">📅 ${lang==='th'?'วันที่กำหนดส่ง (Agreed Due Date)':'Due Date'}</span>
+          <span style="font-size:10px; color:var(--muted); font-weight:normal;">(ระบบคำนวณให้ แก้ไขได้)</span>
+        </div>
+        <input type="date" class="modal-input" id="assign-due-date" value="${due}" style="font-family:var(--mono); font-weight:bold; font-size:14px; color:var(--ocean1);">
+      </div>
+
+      <div class="modal-section" style="margin-top:14px;">
+        <div class="modal-label">${lang==='th'?'หมายเหตุ (Completion Note)':'Remarks'}</div>
+        <textarea class="modal-input" id="assign-remark" rows="2" placeholder="${lang==='th'?'พิมพ์อัปเดตหมายเหตุ...':'Update remarks...'}">${esc(existingRemark)}</textarea>
+      </div>
+
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal()">${lang==='th'?'ยกเลิก':'Cancel'}</button>
         <button class="btn-primary" onclick="confirmJobUpdate80(${rowNum},'${targetStatus}')">${lang==='th'?'✓ ยืนยัน':'✓ Confirm'}</button>
       </div>`);
   }
 
-
   function updateDuePreview(rowNum) {
     const hrs = Number(document.getElementById('assign-hrs').value) || 8;
-
-    // ค้นหาข้อมูลงานปัจจุบันจากอาร์เรย์ (สมมติว่า rowNum คือเลขแถวของการ์ดที่กำลังกดอยู่)
     const currentJob = jobs.find(j => j.rowNum === rowNum);
     const expDate = currentJob ? currentJob.expectedDate : null;
-    // โยน expDate เข้าไปในฟังก์ชันด้วยเป็นตัวที่ 4
     const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
-
-    document.getElementById('due-calc-result').textContent = formatDateDisp(due);
+    const dueInput = document.getElementById('assign-due-date');
+    if (dueInput) dueInput.value = due;
   }
 
-  function confirmAssign(rowNum, targetStatus) {
+
+function confirmAssign(rowNum, targetStatus) {
     const designer = document.getElementById('assign-designer').value;
     const hrs = Number(document.getElementById('assign-hrs').value)||8;
-
-    // ค้นหาข้อมูลงานปัจจุบันจากอาร์เรย์ (สมมติว่า rowNum คือเลขแถวของการ์ดที่กำลังกดอยู่)
-    const currentJob = jobs.find(j => j.rowNum === rowNum);
-    const expDate = currentJob ? currentJob.expectedDate : null;
-    // โยน expDate เข้าไปในฟังก์ชันด้วยเป็นตัวที่ 4
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    const customDue = document.getElementById('assign-due-date').value;
+    const customRemark = document.getElementById('assign-remark').value;
 
     closeModal();
-    serverPost({ action:'assignJob', rowNum, assignee:designer, estimatedDueDate:due, status:targetStatus }, () => toast(lang==='th'?'มอบหมายงานสำเร็จ':'Job assigned!', 'success'));
+    serverPost({ 
+      action:'assignJob', 
+      rowNum, 
+      assignee:designer, 
+      estimatedWorkhours:hrs, 
+      revisedDueDate:customDue, // บันทึกเป็น Revised
+      status:targetStatus,
+      completionNote: customRemark 
+    }, () => {
+      toast(lang==='th'?'มอบหมายงานสำเร็จ':'Job assigned!', 'success');
+      loadData(); // 🚀 โปร 100%: ดึงข้อมูลอัปเดตเงียบๆ หลังบ้าน โดยไม่ทำหน้าขาว!
+    });
   }
 
   function confirmJobUpdate(rowNum, targetStatus) {
     const designer = document.getElementById('assign-designer').value;
     const hrs = Number(document.getElementById('assign-hrs').value)||8;
-
-    // ค้นหาข้อมูลงานปัจจุบันจากอาร์เรย์ (สมมติว่า rowNum คือเลขแถวของการ์ดที่กำลังกดอยู่)
-    const currentJob = jobs.find(j => j.rowNum === rowNum);
-    const expDate = currentJob ? currentJob.expectedDate : null;
-    // โยน expDate เข้าไปในฟังก์ชันด้วยเป็นตัวที่ 4
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    const customDue = document.getElementById('assign-due-date').value;
+    const customRemark = document.getElementById('assign-remark').value;
 
     closeModal();
-
     serverPost({ 
       action:'jobUpdate', 
       rowNum, 
       assignee:designer, 
-      estimatedWorkhours: hrs, // 👈 ส่งชั่วโมงไปเซฟ
-      estimatedDueDate:due,    // 👈 ส่งวันดีลไลน์ไปเซฟ 
-      status:targetStatus 
-    }, () => toast(lang==='th'?'อัปเดตแล้ว':'Updated!', 'success'));
+      estimatedWorkhours: hrs,
+      finalDueDate:customDue, // บันทึกเป็น Final
+      status:targetStatus,
+      completionNote: customRemark 
+    }, () => {
+      toast(lang==='th'?'อัปเดตแล้ว':'Updated!', 'success');
+      loadData(); // 🚀 โปร 100%: ดึงข้อมูลอัปเดตเงียบๆ หลังบ้าน
+    });
   }
 
   function confirmJobUpdate80(rowNum, targetStatus) {
     const designer = document.getElementById('assign-designer').value;
     const hrs = Number(document.getElementById('assign-hrs').value)||8;
-
-    // ค้นหาข้อมูลงานปัจจุบันจากอาร์เรย์ (สมมติว่า rowNum คือเลขแถวของการ์ดที่กำลังกดอยู่)
-    const currentJob = jobs.find(j => j.rowNum === rowNum);
-    const expDate = currentJob ? currentJob.expectedDate : null;
-    // โยน expDate เข้าไปในฟังก์ชันด้วยเป็นตัวที่ 4
-    const due = calcDueDate(todayStr(), hrs, settings.holidays, expDate);
+    const customDue = document.getElementById('assign-due-date').value;
+    const customRemark = document.getElementById('assign-remark').value;
 
     closeModal();
     serverPost({ 
       action:'jobUpdate80', 
       rowNum, 
       assignee:designer, 
-      estimatedWorkhours: hrs, // 👈 ส่งชั่วโมงไปเซฟ
-      estimatedDueDate:due,    // 👈 ส่งวันดีลไลน์ไปเซฟ, 
-      status:targetStatus 
-    }, () => toast(lang==='th'?'อัปเดตแล้ว':'Updated!', 'success'));
+      estimatedWorkhours: hrs,
+      finalDueDate:customDue, // บันทึกเป็น Final
+      status:targetStatus,
+      completionNote: customRemark 
+    }, () => {
+      toast(lang==='th'?'อัปเดตแล้ว':'Updated!', 'success');
+      loadData(); // 🚀 โปร 100%: ดึงข้อมูลอัปเดตเงียบๆ หลังบ้าน
+    });
   }
+  
 
   // ── COMPLETE MODAL ─────────────────────────────────────────
   function openComplete(rowNum) {
@@ -1590,12 +1922,21 @@ function handleCredentialResponse(response) {
 
   function slabel(s) { return STATUS_LABELS[lang][s] || s; }
   function nextStatus(s) { const i = STATUS_FLOW.indexOf(s); return i < STATUS_FLOW.length-1 ? STATUS_FLOW[i+1] : s; }
+  
+  
   function getOverdueClass(j) {
-    const due = j.estimatedDueDate||j.finalDueDate||j.expectedDate||'';
-    if (!due || j.status==='Done' || j.status==='Reject') return '';
+    // 🚀 อัปเดตกฎ Due Date เพื่อให้การแจ้งเตือนสีกระพริบ (แดง/เหลือง) อิงตาม Priority ใหม่
+    const due = j.finalDueDate || j.revisedDueDate || j.estimatedDueDate || j.expectedDate || '';
+    
+    if (!due || j.status === 'Done' || j.status === 'Reject') return '';
+    
     const today = todayStr();
-    if (due < today) return 'overdue'; if (due === today) return 'due-today'; return '';
+    if (due < today) return 'overdue'; 
+    if (due === today) return 'due-today'; 
+    return '';
   }
+
+  
   function isOverdue(j) { return getOverdueClass(j) === 'overdue'; }
   function todayStr() { return dateToStr(new Date()); }
   function dateToStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -2043,6 +2384,11 @@ function handleCredentialResponse(response) {
           <td class="${rateClass}" style="font-family:var(--mono); font-weight:600;">${d.doneCount > 0 ? d.onTimeRate + '%' : '—'}</td>
           <td class="${earlyClass}" style="font-family:var(--mono); font-weight:600; color:var(--ocean1);">${d.doneCount > 0 ? d.earlyRate + '%' : '—'}</td>
           <td style="font-family:var(--mono); text-align:center;"><span class="status-pill ${loadPillClass}">${d.activeCount} งาน</span></td>
+
+          <td style="text-align:right;">
+            <button class="card-btn" style="border-color:var(--ocean1); color:var(--ocean1);" onclick="printPerformanceReport('${d.name}')">🖨️ พิมพ์ใบสรุปงาน</button>
+          </td>
+
           </tr>`;
       }).join('');
     }
@@ -2173,4 +2519,141 @@ function handleCredentialResponse(response) {
       .catch(function(err) {
         box.innerHTML = `<div style="color:var(--red); font-size:12px; padding:10px;">❌ ไม่สามารถเชื่อมต่อระบบได้: ${err.message}</div>`;
       });
+  }
+
+
+  // ============================================================
+  // 🖨️ PRINT PERFORMANCE REPORT (ใบสรุปผลงานรายบุคคล)
+  // ============================================================
+  function printPerformanceReport(designerName) {
+    // 1. ดึงข้อมูลงานทั้งหมดที่น้องรับผิดชอบ (ไม่นับงานที่ถูก Reject)
+    const allAssigned = jobs.filter(function(j) { return j.assignee === designerName && j.status !== 'Reject'; });
+    const totalAssigned = allAssigned.length;
+    
+    // 2. ดึงข้อมูลเฉพาะงานที่ "เสร็จแล้ว" เพื่อเอามาคำนวณ KPI
+    const dJobs = allAssigned.filter(function(j) { return j.status === 'Done'; });
+    
+    if (totalAssigned === 0) {
+      toast(lang==='th' ? 'ไม่มีผลงานให้ปริ้นท์' : 'No jobs to print', 'error');
+      return;
+    }
+
+    const totalDone = dJobs.length;
+    const totalHours = dJobs.reduce(function(sum, j) { return sum + (Number(j.estimatedWorkhours) || 0); }, 0);
+    
+    const mboValues = dJobs.map(function(j) {
+      const agreedDue = j.finalDueDate || j.estimatedDueDate || j.expectedDate || '';
+      return (j.completedDate && agreedDue) ? dayDiff(agreedDue, j.completedDate) : null;
+    }).filter(function(v) { return v !== null; });
+
+    // คำนวณ KPI
+    const avgMBO = mboValues.length > 0 ? (mboValues.reduce(function(s, v) { return s + v; }, 0) / mboValues.length).toFixed(1) : 0;
+    
+    // อัตราตรงเวลา (On-Time: ส่งตรงวันเป๊ะ หรือก่อนกำหนด)
+    const onTimeCount = mboValues.filter(function(v) { return v >= 0; }).length;
+    const onTimeRate = mboValues.length > 0 ? Math.round((onTimeCount / mboValues.length) * 100) : 0;
+    
+    // อัตราส่งงานเร็ว (Early: ส่งก่อนกำหนดเท่านั้น MBO > 0)
+    const earlyCount = mboValues.filter(function(v) { return v > 0; }).length;
+    const earlyRate = mboValues.length > 0 ? Math.round((earlyCount / mboValues.length) * 100) : 0;
+
+    // หาปีปัจจุบัน
+    const currentYear = new Date().getFullYear();
+
+    const printWin = window.open('', '_blank');
+    
+    // 🚀 สร้างเอกสาร HTML (แบบ String ล้วน หลบการ Error ของ Google)
+    const htmlContent = '<!DOCTYPE ' + 'html>\n' +
+      '<html>\n' +
+      '<head>\n' +
+        '<meta charset="UTF-8">\n' +
+        '<title>ใบสรุปผลงาน - ' + esc(designerName) + '</title>\n' +
+        '<style>\n' +
+          'body { font-family: "Sarabun", "Segoe UI", sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 40px; }\n' +
+          '.header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #0ea5e9; padding-bottom: 20px; }\n' +
+          '.header h1 { margin: 0; color: #0ea5e9; font-size: 28px; }\n' +
+          '.header p { margin: 5px 0 0 0; color: #666; font-size: 18px; }\n' +
+          '.profile { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; }\n' +
+          '.avatar { width: 60px; height: 60px; background: #0ea5e9; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; }\n' +
+          '.name-box h2 { margin: 0; font-size: 24px; }\n' +
+          '.name-box p { margin: 0; color: #666; }\n' +
+          '.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px; }\n' +
+          '.stat-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #f8fafc; text-align: center; }\n' +
+          '.stat-label { font-size: 13px; color: #64748b; margin-bottom: 8px; line-height: 1.4; }\n' +
+          '.stat-value { font-size: 26px; font-weight: bold; color: #0f172a; }\n' +
+          '.stat-value.good { color: #059669; }\n' +
+          '.stat-value.warn { color: #ea580c; }\n' +
+          '.signature-section { margin-top: 80px; display: flex; justify-content: space-between; text-align: center; }\n' +
+          '.sig-box { width: 250px; }\n' +
+          '.sig-line { border-bottom: 1px solid #333; height: 40px; margin-bottom: 10px; }\n' +
+          '@media print { body { padding: 0; } .stat-box { -webkit-print-color-adjust: exact; background: #f8fafc !important; } }\n' +
+        '</style>\n' +
+      '</head>\n' +
+      '<body onload="setTimeout(function(){ window.print(); }, 500);">\n' +
+        '<div class="header">\n' +
+          '<h1>ใบสรุปผลงาน (Performance Summary Report)</h1>\n' +
+          '<p>เอกสารสรุปผลการปฏิบัติงาน ประจำปี ' + currentYear + '</p>\n' +
+        '</div>\n' +
+        '<div class="profile">\n' +
+          '<div class="avatar">' + esc(designerName.charAt(0)) + '</div>\n' +
+          '<div class="name-box">\n' +
+            '<h2>' + esc(designerName) + '</h2>\n' +
+            '<p>ตำแหน่ง: Graphic Designer</p>\n' +
+          '</div>\n' +
+        '</div>\n' +
+        '<div class="grid">\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">งานที่รับผิดชอบทั้งหมด<br>(Assigned Jobs)</div>\n' +
+            '<div class="stat-value">' + totalAssigned + ' <span style="font-size:14px;font-weight:normal;color:#666;">ชิ้น</span></div>\n' +
+          '</div>\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">ชิ้นงานที่ส่งสำเร็จ<br>(Completed Jobs)</div>\n' +
+            '<div class="stat-value">' + totalDone + ' <span style="font-size:14px;font-weight:normal;color:#666;">ชิ้น</span></div>\n' +
+          '</div>\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">ชั่วโมงงานสะสม<br>(Total Est. Hours)</div>\n' +
+            '<div class="stat-value" style="color:#0ea5e9;">' + totalHours + ' <span style="font-size:14px;font-weight:normal;color:#666;">ชม.</span></div>\n' +
+          '</div>\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">อัตราส่งงานตรงเวลา<br>(On-Time Rate)</div>\n' +
+            '<div class="stat-value ' + (onTimeRate >= 80 ? 'good' : 'warn') + '">' + onTimeRate + '%</div>\n' +
+          '</div>\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">อัตราส่งงานเร็วกว่ากำหนด<br>(Early Delivery)</div>\n' +
+            '<div class="stat-value ' + (earlyRate >= 50 ? 'good' : '') + '">' + earlyRate + '%</div>\n' +
+          '</div>\n' +
+          '<div class="stat-box">\n' +
+            '<div class="stat-label">ประสิทธิภาพเวลาเฉลี่ย<br>(Avg. MBO)</div>\n' +
+            '<div class="stat-value ' + (avgMBO >= 0 ? 'good' : 'warn') + '">' + (avgMBO >= 0 ? '+' : '') + avgMBO + ' <span style="font-size:14px;font-weight:normal;color:#666;">วัน</span></div>\n' +
+          '</div>\n' +
+        '</div>\n' +
+        '<div style="background:#f1f5f9; padding:20px; border-radius:8px; border-left:4px solid #0ea5e9;">\n' +
+          '<h3 style="margin-top:0; color:#334155;">💡 สรุปภาพรวม (Executive Summary)</h3>\n' +
+          '<p style="margin:0; color:#475569;">\n' +
+            'ในปี <strong>' + currentYear + '</strong> พนักงานได้รับมอบหมายงานทั้งสิ้น <strong>' + totalAssigned + '</strong> ชิ้น ' +
+            'และสามารถดำเนินการส่งมอบงานจนสำเร็จได้ <strong>' + totalDone + '</strong> ชิ้น ' +
+            'คิดเป็นปริมาณงานรวม <strong>' + totalHours + '</strong> ชั่วโมง<br><br>' +
+            'ด้านความรับผิดชอบต่อเวลา พบว่ามีอัตราการส่งงานมอบงานได้ตรงเวลา (On-Time) อยู่ที่ <strong>' + onTimeRate + '%</strong> ' +
+            'โดยแบ่งเป็นผลงานที่ส่งมอบได้ <u>รวดเร็วกว่ากำหนด</u> (Early) ถึง <strong>' + earlyRate + '%</strong> ' +
+            'และมีค่าเฉลี่ยในการบริหารเวลา (MBO) อยู่ที่ <strong>' + (avgMBO >= 0 ? '+' : '') + avgMBO + '</strong> วันต่อชิ้นงาน\n' +
+          '</p>\n' +
+        '</div>\n' +
+        '<div class="signature-section">\n' +
+          '<div class="sig-box">\n' +
+            '<div class="sig-line"></div>\n' +
+            '<div>( ' + esc(designerName) + ' )</div>\n' +
+            '<div style="color:#666;font-size:14px;margin-top:4px;">พนักงานผู้รับการประเมิน</div>\n' +
+          '</div>\n' +
+          '<div class="sig-box">\n' +
+            '<div class="sig-line"></div>\n' +
+            '<div>( ' + esc(settings.userName || '....................................') + ' )</div>\n' +
+            '<div style="color:#666;font-size:14px;margin-top:4px;">หัวหน้างานผู้ประเมิน</div>\n' +
+          '</div>\n' +
+        '</div>\n' +
+      '</body>\n' +
+      '</html>';
+
+    printWin.document.open();
+    printWin.document.write(htmlContent);
+    printWin.document.close();
   }
