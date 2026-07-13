@@ -9,8 +9,11 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
   
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <link rel="stylesheet" href="css/style.css">
 
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
   <?!= include('styles'); ?>
 </head>
 <body>
@@ -250,10 +253,8 @@
 </div>
 
 <div id="toast-container"></div>
-<script>
-  const SERVER_URL = '<?= serverUrl ?>';
-  let   USER_EMAIL = '<?= userEmail ?>';
-</script>
+  
+<script src="js/script.js"></script>
 
 <?!= include('javascript'); ?>
 </body>
